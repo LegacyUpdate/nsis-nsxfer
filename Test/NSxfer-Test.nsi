@@ -4,13 +4,13 @@
 
 !ifdef AMD64
 	!define _TARGET_ amd64-unicode
+	Target ${_TARGET_}
 !else ifdef ANSI
 	!define _TARGET_ x86-ansi
+	Target ${_TARGET_}
 !else
 	!define _TARGET_ x86-unicode		; Default
 !endif
-
-Target ${_TARGET_}
 
 !include "MUI2.nsh"
 !define LOGICLIB_STRCMP
@@ -19,6 +19,7 @@ Target ${_TARGET_}
 
 !include "StrFunc.nsh"
 ${StrRep}				; Declare in advance
+${StrTok}				; Declare in advance
 
 !define /ifndef NULL 0
 
@@ -85,6 +86,13 @@ Function .onInit
 	NSxfer::Transfer /METHOD POST /MODE Popup /URL "${LINK}" /LOCAL "${FILE}" /DATA 'User=My+User&Pass=My+Pass' /HEADERS "Content-Type: application/x-www-form-urlencoded$\r$\nContent-Dummy: Dummy" /TIMEOUTCONNECT 15000 /TIMEOUTRECONNECT 60000 /REFERER "https://wikipedia.org" /END
 	Pop $0
 */
+
+    ; Quick .onInit plugin test
+    NSxfer::QueryGlobal /PLUGINNAME /END
+    Pop $0
+    ${If} $0 != "NSxfer"
+        MessageBox MB_ICONSTOP '[.onInit]$\nFailed to query plugin name$\nReturn value: "$0"'
+    ${EndIf}
 FunctionEnd
 
 
@@ -108,7 +116,7 @@ Section /o "HTTP GET (Page mode)"
 	DetailPrint '${__SECTION__}'
 	DetailPrint '-----------------------------------------------'
 
-	!define /redef LINK 'http://live.sysinternals.com/Files/SysinternalsSuite.zip'
+	!define /redef LINK 'https://download.sysinternals.com/files/SysinternalsSuite.zip'
 	!define /redef FILE '$EXEDIR\_SysinternalsSuite.zip'
 	DetailPrint 'NSxfer::Transfer "${LINK}" "${FILE}"'
 	NSxfer::Transfer /URL "${LINK}" /LOCAL "${FILE}" /TIMEOUTCONNECT 15000 /TIMEOUTRECONNECT 30000 /END
@@ -147,6 +155,52 @@ Section /o "HTTP GET (Silent mode)"
 	NSxfer::Transfer /URL "${LINK}" /LOCAL "${FILE}" /Mode Silent /END
 	Pop $0
 	DetailPrint "Status: $0"
+SectionEnd
+
+
+Section /o "HTTP GET (Memory)"
+	SectionIn 1	; All
+
+	DetailPrint '-----------------------------------------------'
+	DetailPrint '${__SECTION__}'
+	DetailPrint '-----------------------------------------------'
+
+	!define /redef LINK `https://wikipedia.org`
+	!define /redef FILE "memory"
+	DetailPrint 'NSxfer::Transfer "${LINK}" "${FILE}"'
+
+    NSxfer::Transfer /URL "${LINK}" /LOCAL "${FILE}" /RETURNID /END
+	Pop $0 ; Unique transfer ID
+
+	NSxfer::Query /ID $0 /ERRORTEXT /CONTENT /END
+    Pop $1 ; Transfer status
+    Pop $2 ; Remote content (trimmed to NSIS_MAX_STRLEN)
+
+    StrCpy $2 $2 64
+    StrCpy $2 "$2..."
+	DetailPrint "Status: $1, Content: $2"
+SectionEnd
+
+
+!define /redef COUNT 32
+Section /o "HTTP GET (Memory * ${COUNT}x)"
+	SectionIn 1	; All
+
+	DetailPrint '-----------------------------------------------'
+	DetailPrint '${__SECTION__}'
+	DetailPrint '-----------------------------------------------'
+
+	!define /redef FILE "memory"
+
+    ${For} $R0 1 ${COUNT}
+        StrCpy $R1 "https://httpbin.org/post?index=$R0&total=${COUNT}"
+        DetailPrint 'NSxfer::Request [$R0/${COUNT}] $R1 "${FILE}"'
+        NSxfer::Request /URL $R1 /LOCAL "${FILE}" /METHOD POST /END
+        Pop $0
+    ${Next}
+
+	NSxfer::Wait /ABORT "" "" /END
+    Pop $1
 SectionEnd
 
 
@@ -190,14 +244,14 @@ Section /o "HTTP GET (Parallel transfers)"
 SectionEnd
 
 
-Section /o "HTTP GET (proxy)"
+Section /o "-HTTP GET (proxy)"
 	SectionIn 1	; All
 
 	DetailPrint '-----------------------------------------------'
 	DetailPrint '${__SECTION__}'
 	DetailPrint '-----------------------------------------------'
 
-	!define /redef LINK  "https://live.sysinternals.com/Files/SysinternalsSuite.zip"
+	!define /redef LINK  "https://download.sysinternals.com/files/SysinternalsSuite.zip"
 	!define /redef FILE  "$EXEDIR\_SysinternalsSuiteLive_proxy.zip"
 	!define /redef PROXY "http=54.36.139.108:8118 https=54.36.139.108:8118"			; France
 	DetailPrint 'NSxfer::Transfer /proxy ${PROXY} "${LINK}" "${FILE}"'
@@ -217,7 +271,7 @@ Section /o "HTTP POST (application/json)"
 	!define /redef LINK 'https://httpbin.org/post?param1=1&param2=2'
 	!define /redef FILE '$EXEDIR\_Post_json.json'
 	DetailPrint 'NSxfer::Transfer "${LINK}" "${FILE}"'
-	NSxfer::Transfer /METHOD POST /URL "${LINK}" /LOCAL "${FILE}" /DATA '{"number_of_the_beast" : 666}' /HEADERS "Content-Type: application/json" /TIMEOUTCONNECT 15000 /TIMEOUTRECONNECT 60000 /REFERER "https://wikipedia.org" /END
+	NSxfer::Transfer /METHOD Post /URL "${LINK}" /LOCAL "${FILE}" /DATA '{"number_of_the_beast" : 666}' /HEADERS "Content-Type: application/json" /TIMEOUTCONNECT 15000 /TIMEOUTRECONNECT 60000 /REFERER "https://wikipedia.org" /END
 	Pop $0
 	DetailPrint "Status: $0"
 SectionEnd
@@ -311,6 +365,126 @@ Section /o "Test Dependencies (depend on previous request)"
 SectionEnd
 
 
+; Input: [Stack] Request ID
+; Output: None
+Function PrintRequest
+    Exch $R1    ; Request ID
+	Push $0
+    Push $1
+    Push $2
+
+    NSxfer::Query /ID $R1 /PRIORITY /DEPEND /STATUS /WININETSTATUS /METHOD /URL /PROXY /IP /LOCAL /DATA /SENTHEADERS /RECVHEADERS /RECVSIZE /FILESIZE /PERCENT /SPEEDBYTES /SPEED /TIMEWAITING /TIMEDOWNLOADING /ERRORCODE /ERRORTEXT /CONNECTIONDROPS /CONTENT /END
+
+    StrCpy $0 "[>] ID:$R1"
+    Pop $1 ;PRIORITY
+    StrCpy $0 "$0, Prio:$1"
+    Pop $1 ;DEPEND
+    IntCmp $1 0 +2 +1 +1
+        StrCpy $0 "$0, DependsOn:$1"
+    Pop $1 ;STATUS
+    StrCpy $0 "$0, [$1]"
+    Pop $1 ;WININETSTATUS
+    StrCpy $0 "$0, WinINet:$1"
+    DetailPrint $0
+
+    StrCpy $0 "  [Request]"
+    Pop $1 ;METHOD
+    StrCpy $0 "$0 $1"
+    Pop $1 ;URL
+    StrCpy $0 "$0 $1"
+    DetailPrint $0
+
+    Pop $1 ;PROXY
+    StrCmp $1 "" +2 +1
+        DetailPrint "  [Proxy] $1"
+    Pop $1 ;IP
+    StrCmp $1 "" +2 +1
+        DetailPrint "  [Server] $1"
+
+    Pop $1 ;LOCAL
+    DetailPrint "  [Local] $1"
+
+    Pop $1 ;DATA
+    ${If} $1 != ""
+        ${StrRep} $1 "$1" "$\r" "\r"
+        ${StrRep} $1 "$1" "$\n" "\n"
+        DetailPrint "  [Sent Data] $1"
+    ${EndIf}
+    Pop $1 ;SENTHEADERS
+    ${If} $1 != ""
+        DetailPrint "  [Sent Headers]"
+        ${For} $2 0 100
+            ${StrTok} $0 $1 "$\r$\n" $2 1
+            ${If} $0 == ""
+                ${Break}
+            ${EndIf}
+            DetailPrint "    $0"
+        ${Next}
+    ${EndIf}
+    Pop $1 ;RECVHEADERS
+    ${If} $1 != ""
+        DetailPrint "  [Recv Headers]"
+        ${For} $2 0 100
+            ${StrTok} $0 $1 "$\r$\n" $2 1
+            ${If} $0 == ""
+                ${Break}
+            ${EndIf}
+            DetailPrint "    $0"
+        ${Next}
+    ${EndIf}
+
+    StrCpy $0 "  [Size]"
+    Pop $1 ;RECVSIZE
+    StrCpy $0 "$0 $1"
+    Pop $1 ;FILESIZE
+    StrCpy $0 "$0/$1"
+    Pop $1 ;PERCENT
+    StrCpy $0 "$0 ($1%)"
+    Pop $1 ;SPEEDBYTES
+    Pop $1 ;SPEED
+    StrCmp $1 "" +2 +1
+        StrCpy $0 "$0 @ $1"
+    DetailPrint "$0"
+
+    StrCpy $0 "  [Time]"
+    Pop $1 ;TIMEWAITING
+    StrCpy $0 "$0 Waiting $1ms"
+    Pop $1 ;TIMEDOWNLOADING
+    StrCpy $0 "$0, Downloading $1ms"
+    DetailPrint "$0"
+
+    StrCpy $0 "  [Error]"
+    Pop $1 ;ERRORCODE
+    StrCpy $0 "$0 $1"
+    Pop $1 ;ERRORTEXT
+    StrCpy $0 "$0, $1"
+    Pop $1 ;CONNECTIONDROPS
+    IntCmp $1 0 +2 +1 +1
+        StrCpy $0 "$0, Drops:$1"
+    DetailPrint "$0"
+
+    Pop $1 ;CONTENT
+    ${If} $1 != ""
+        ; DetailPrint "  [Content]"
+        ; ${For} $2 0 100
+        ;     ${StrTok} $0 $1 "$\r$\n" $2 1
+        ;     ${If} $0 == ""
+        ;         ${Break}
+        ;     ${EndIf}
+        ;     DetailPrint "    $0"
+        ; ${Next}
+        ${StrRep} $1 "$1" "$\r" "\r"
+        ${StrRep} $1 "$1" "$\n" "\n"
+        DetailPrint "  [Content] $1"
+    ${EndIf}
+
+    Pop $2
+    Pop $1
+    Pop $0
+    Pop $R1
+FunctionEnd
+
+
 Function PrintSummary
 
 	Push $0
@@ -330,95 +504,7 @@ Function PrintSummary
 	Pop $1	; Count
 	DetailPrint "    $1 requests"
 	${For} $0 1 $1
-
-		Pop $2	; Request ID
-
-		NSxfer::Query /ID $2 /PRIORITY /DEPEND /STATUS /WININETSTATUS /METHOD /URL /PROXY /IP /LOCAL /DATA /SENTHEADERS /RECVHEADERS /RECVSIZE /FILESIZE /PERCENT /SPEEDBYTES /SPEED /TIMEWAITING /TIMEDOWNLOADING /ERRORCODE /ERRORTEXT /CONNECTIONDROPS /CONTENT /END
-
-		StrCpy $R0 "[>] ID:$2"
-		Pop $3 ;PRIORITY
-		StrCpy $R0 "$R0, Prio:$3"
-		Pop $3 ;DEPEND
-		IntCmp $3 0 +2 +1 +1
-			StrCpy $R0 "$R0, DependsOn:$3"
-		Pop $3 ;STATUS
-		StrCpy $R0 "$R0, [$3]"
-		Pop $3 ;WININETSTATUS
-		StrCpy $R0 "$R0, WinINet:$3"
-		DetailPrint $R0
-
-		StrCpy $R0 "  [Request]"
-		Pop $3 ;METHOD
-		StrCpy $R0 "$R0 $3"
-		Pop $3 ;URL
-		StrCpy $R0 "$R0 $3"
-		DetailPrint $R0
-
-		Pop $3 ;PROXY
-		StrCmp $3 "" +2 +1
-			DetailPrint "  [Proxy] $3"
-		Pop $3 ;IP
-		StrCmp $3 "" +2 +1
-			DetailPrint "  [Server] $3"
-
-		Pop $3 ;LOCAL
-		DetailPrint "  [Local] $3"
-
-		Pop $3 ;DATA
-		${If} $3 != ""
-			${StrRep} $3 "$3" "$\r" "\r"
-			${StrRep} $3 "$3" "$\n" "\n"
-			DetailPrint "  [Sent Data] $3"
-		${EndIf}
-		Pop $3 ;SENTHEADERS
-		${If} $3 != ""
-			${StrRep} $3 "$3" "$\r" "\r"
-			${StrRep} $3 "$3" "$\n" "\n"
-			DetailPrint "  [Sent Headers] $3"
-		${EndIf}
-		Pop $3 ;RECVHEADERS
-		${If} $3 != ""
-			${StrRep} $3 "$3" "$\r" "\r"
-			${StrRep} $3 "$3" "$\n" "\n"
-			DetailPrint "  [Recv Headers] $3"
-		${EndIf}
-
-		StrCpy $R0 "  [Size]"
-		Pop $3 ;RECVSIZE
-		StrCpy $R0 "$R0 $3"
-		Pop $3 ;FILESIZE
-		StrCpy $R0 "$R0/$3"
-		Pop $3 ;PERCENT
-		StrCpy $R0 "$R0 ($3%)"
-		Pop $3 ;SPEEDBYTES
-		Pop $3 ;SPEED
-		StrCmp $3 "" +2 +1
-			StrCpy $R0 "$R0 @ $3"
-		DetailPrint "$R0"
-
-		StrCpy $R0 "  [Time]"
-		Pop $3 ;TIMEWAITING
-		StrCpy $R0 "$R0 Waiting $3ms"
-		Pop $3 ;TIMEDOWNLOADING
-		StrCpy $R0 "$R0, Downloading $3ms"
-		DetailPrint "$R0"
-
-		StrCpy $R0 "  [Error]"
-		Pop $3 ;ERRORCODE
-		StrCpy $R0 "$R0 $3"
-		Pop $3 ;ERRORTEXT
-		StrCpy $R0 "$R0, $3"
-		Pop $3 ;CONNECTIONDROPS
-		IntCmp $3 0 +2 +1 +1
-			StrCpy $R0 "$R0, Drops:$3"
-		DetailPrint "$R0"
-
-		Pop $3 ;CONTENT
-		${If} $3 != ""
-			${StrRep} $3 "$3" "$\r" "\r"
-			${StrRep} $3 "$3" "$\n" "\n"
-			DetailPrint "  [Content] $3"
-		${EndIf}
+        Call PrintRequest
 	${Next}
 
 	NSxfer::QueryGlobal /TOTALCOUNT /TOTALCOMPLETED /TOTALDOWNLOADING /TOTALSPEED /TOTALTHREADS /PLUGINNAME /PLUGINVERSION /USERAGENT /END
