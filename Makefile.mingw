@@ -66,6 +66,10 @@ CFLAGS += \
 	-fdata-sections \
 	-fno-unwind-tables \
 	-fno-asynchronous-unwind-tables \
+    -Wall \
+    -Wno-unused-function \
+    -Wno-unused-variable \
+    -Wno-unused-but-set-variable \
 	$(INC) \
 	$(CUSTOM_CFLAGS)
 
@@ -86,15 +90,19 @@ RCFLAGS += \
 	$(CUSTOM_RCFLAGS)
 
 
-.PHONY: clean all-before all all-after
+.PHONY: clean all-before nsis-sdk all all-after
 
 clean:
 	rm -rf $(OUTDIR)
 
-all: all-before $(_BIN) all-after
+all: all-before nsis-sdk $(_BIN) all-after
 
 all-before:
 	mkdir -p $(OUTDIR)
+
+nsis-sdk:
+	REM ----- NSIS SDK ------------------------------------------------------------
+	call py -3 _get_nsis_sdk.py
 
 # Link
 $(_BIN): $(_OBJ)

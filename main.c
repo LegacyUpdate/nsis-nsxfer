@@ -42,14 +42,14 @@ BOOL PluginInit()
 
 
 //++ PluginUninit
-BOOL PluginUninit( _In_ BOOLEAN bForced )
+BOOL PluginUninit()
 {
 	BOOL bRet = FALSE;
 	if ( g_bInitialized ) {
 
-		TRACE( _T( "PluginUninit(Forced:%u)\n" ), (ULONG)bForced );
+		TRACE( _T( "PluginUninit\n" ));
 
-		QueueDestroy( &g_Queue, bForced );
+		QueueDestroy( &g_Queue );
 		UtilsDestroy();
 
 		g_bInitialized = FALSE;
@@ -83,6 +83,7 @@ BOOL ParseRequestParameter(
 			if (*psz) {
 				MyFree( pParam->pszMethod );
 				MyStrDup( pParam->pszMethod, psz );
+				MyMakeUpper( pParam->pszMethod );
 			}
 		}
 	} else if (lstrcmpi( psz, _T( "/URL" ) ) == 0) {
@@ -210,14 +211,13 @@ void __cdecl Request(
 	QUEUE_REQUEST_PARAM Param;
 	PQUEUE_REQUEST pReq = NULL;
 
+	EXDLL_VALID_PARAMS();
 	EXDLL_INIT();
 	EXDLL_VALIDATE();
 
 	TRACE_CALL( stacktop, _T( "NSxfer!Request" ) );
 
-	/// Receive unload notification
-	/// By registering PluginCallback the plugin remains locked in memory
-	/// Otherwise the framework would unload it when this call returns... Unless the caller specifies /NOUNLOAD...
+	// Lock the plugin in memory. PluginCallback will start receiving unload notifications
 	extra->RegisterPluginCallback( g_hInst, PluginCallback );
 
 	/// Working buffer
@@ -269,10 +269,14 @@ void __cdecl QueryGlobal(
 	ULONG64 iTotalRecvBytes = 0;
 	ULONG iTotalSpeed = 0;
 
+	EXDLL_VALID_PARAMS();
 	EXDLL_INIT();
 	EXDLL_VALIDATE();
 
 	TRACE_CALL( stacktop, _T( "NSxfer!QueryGlobal" ) );
+
+	// Lock the plugin in memory. PluginCallback will start receiving unload notifications
+	extra->RegisterPluginCallback( g_hInst, PluginCallback );
 
 	/// Allocate the working buffer
 	psz = (LPTSTR)MyAlloc( string_size * sizeof( TCHAR ) );
@@ -386,10 +390,14 @@ void __cdecl Query(
 	LPTSTR pParam[30];
 	int iParamCount = 0, iDropCount = 0, i;
 
+	EXDLL_VALID_PARAMS();
 	EXDLL_INIT();
 	EXDLL_VALIDATE();
 
 	TRACE_CALL( stacktop, _T( "NSxfer!Query" ) );
+
+	// Lock the plugin in memory. PluginCallback will start receiving unload notifications
+	extra->RegisterPluginCallback( g_hInst, PluginCallback );
 
 	/// Allocate the working buffer
 	psz = (LPTSTR)MyAlloc( string_size * sizeof( TCHAR ) );
@@ -582,10 +590,14 @@ void __cdecl Set(
 	BOOLEAN bRemove = FALSE;
 	BOOLEAN bAbort = FALSE;
 
+	EXDLL_VALID_PARAMS();
 	EXDLL_INIT();
 	EXDLL_VALIDATE();
 
 	TRACE_CALL( stacktop, _T( "NSxfer!Set" ) );
+
+	// Lock the plugin in memory. PluginCallback will start receiving unload notifications
+	extra->RegisterPluginCallback( g_hInst, PluginCallback );
 
 	// Parameters
 	psz = (LPTSTR)MyAlloc( string_size * sizeof( TCHAR ) );
@@ -615,7 +627,7 @@ void __cdecl Set(
 	// Set
 	if (TRUE) {
 
-		int iThreadsToWake = 0;
+		ULONG iThreadsToWake = 0;
 		PQUEUE_REQUEST pReq;
 
 		QueueLock( &g_Queue );
@@ -672,10 +684,14 @@ void __cdecl Enumerate(
 	REQUEST_STATUS iStatus = ANY_STATUS;
 	ULONG iPrio = ANY_PRIORITY;
 
+	EXDLL_VALID_PARAMS();
 	EXDLL_INIT();
 	EXDLL_VALIDATE();
 
 	TRACE_CALL( stacktop, _T( "NSxfer!Enumerate" ) );
+
+	// Lock the plugin in memory. PluginCallback will start receiving unload notifications
+	extra->RegisterPluginCallback( g_hInst, PluginCallback );
 
 	// Decide what requests to enumerate
 	psz = (LPTSTR)MyAlloc( string_size * sizeof( TCHAR ) );
@@ -805,14 +821,13 @@ void __cdecl Wait(
 	LPTSTR psz;
 	GUI_WAIT_PARAM Param;
 
+	EXDLL_VALID_PARAMS();
 	EXDLL_INIT();
 	EXDLL_VALIDATE();
 
 	TRACE_CALL( stacktop, _T( "NSxfer!Wait" ) );
 
-	/// Receive unload notification
-	/// By registering PluginCallback the plugin remains locked in memory
-	/// Otherwise the framework would unload it when this call returns... Unless the caller specifies /NOUNLOAD...
+	// Lock the plugin in memory. PluginCallback will start receiving unload notifications
 	extra->RegisterPluginCallback( g_hInst, PluginCallback );
 
 	/// Working buffer
@@ -856,15 +871,15 @@ void __cdecl Transfer(
 	QUEUE_REQUEST_PARAM ReqParam;
 	GUI_WAIT_PARAM WaitParam;
 	PQUEUE_REQUEST pReq = NULL;
+	BOOL bReturnID = FALSE;
 
+	EXDLL_VALID_PARAMS();
 	EXDLL_INIT();
 	EXDLL_VALIDATE();
 
 	TRACE_CALL( stacktop, _T( "NSxfer!Transfer" ) );
 
-	/// Receive unload notification
-	/// By registering PluginCallback the plugin remains locked in memory
-	/// Otherwise the framework would unload it when this call returns... Unless the caller specifies /NOUNLOAD...
+	// Lock the plugin in memory. PluginCallback will start receiving unload notifications
 	extra->RegisterPluginCallback( g_hInst, PluginCallback );
 
 	/// Working buffer
@@ -880,10 +895,14 @@ void __cdecl Transfer(
 		if (lstrcmpi( psz, _T( "/END" ) ) == 0)
 			break;
 
-		if (!ParseRequestParameter( string_size, psz, &ReqParam ) &&
-			!ParseWaitParameter( string_size, psz, &WaitParam ))
+		if (lstrcmpi(psz, _T("/RETURNID")) == 0) {
+			bReturnID = TRUE;
+		} else if (	ParseRequestParameter(string_size, psz, &ReqParam) ||
+					ParseWaitParameter(string_size, psz, &WaitParam))
 		{
-			TRACE( _T( "  [!] Unknown parameter \"%s\"\n" ), psz );
+			// Valid parameter, saved to pReq
+		} else {
+			TRACE(_T("  [!] Unknown parameter \"%s\"\n"), psz);
 		}
 	}
 
@@ -902,13 +921,17 @@ void __cdecl Transfer(
 	// Return value
 	if (pReq) {
 		QueueLock( &g_Queue );
-		if (pReq->iWin32Error == ERROR_SUCCESS) {
-			if (pReq->iHttpStatus > 200 && pReq->iHttpStatus < 300)
-				pushstring( _T( "OK" ) );				/// Convert any successful HTTP status to "OK"
-			else
-				safepushstring( pReq->pszHttpStatus );	/// HTTP status
+		if (bReturnID) {
+			pushint(pReq->iId);
 		} else {
-			safepushstring( pReq->pszWin32Error );		/// Win32 error
+			if (pReq->iWin32Error == ERROR_SUCCESS) {
+				if (pReq->iHttpStatus > 200 && pReq->iHttpStatus < 300)
+					pushstring(_T("OK"));				/// Convert any successful HTTP status to "OK"
+				else
+					safepushstring(pReq->pszHttpStatus);	/// HTTP status
+			} else {
+				safepushstring(pReq->pszWin32Error);		/// Win32 error
+			}
 		}
 		QueueUnlock( &g_Queue );
 	} else {
@@ -931,10 +954,14 @@ void __cdecl Test(
 	extra_parameters *extra
 	)
 {
+	EXDLL_VALID_PARAMS();
 	EXDLL_INIT();
 	EXDLL_VALIDATE();
 
 	TRACE_CALL( stacktop, _T( "NSxfer!Test" ) );
+
+	// Lock the plugin in memory. PluginCallback will start receiving unload notifications
+	extra->RegisterPluginCallback( g_hInst, PluginCallback );
 
 	/*{
 		ULONGLONG ull, ull2;
@@ -965,7 +992,7 @@ UINT_PTR __cdecl PluginCallback( enum NSPIM iMessage )
 	{
 		case NSPIM_UNLOAD:
 			TRACE( _T( "NSPIM_UNLOAD\n" ) );
-			//x PluginUninit( FALSE );		// DLL_PROCESS_DETACH will handle it
+			PluginUninit();
 			break;
 
 		case NSPIM_GUIUNLOAD:
@@ -989,7 +1016,7 @@ BOOL WINAPI DllMain(
 		PluginInit();
 	}
 	else if ( iReason == DLL_PROCESS_DETACH ) {
-		PluginUninit( TRUE );
+		PluginUninit();
 	}
 	return TRUE;
 }

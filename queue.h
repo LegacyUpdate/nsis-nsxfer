@@ -4,16 +4,20 @@
 #pragma once
 #include "thread.h"
 
+#define KILOBYTES(n)				((n) * 1024)
+#define MEGABYTES(n)				((n) * 1024 * 1024)
+
 #define MIN_WORKER_THREADS			2
 #define MAX_WORKER_THREADS			20
-#define INVALID_FILE_SIZE64			(ULONG64)-1
+#define INVALID_FILE_SIZE64			((ULONG64)-1)
 #define DEFAULT_VALUE				((ULONG)-1)
 #define DEFAULT_PRIORITY			1000
-#define MIN_BUFFER_SIZE				2 * 1024		/// 2KB
-#define MAX_BUFFER_SIZE				1024 * 1024 * 2	/// 2MB
+#define MIN_BUFFER_SIZE				KILOBYTES(2)
+#define MAX_BUFFER_SIZE				MEGABYTES(2)
+#define MAX_MEMORY_CONTENT_LENGTH	KILOBYTES(16)	// The NSIS script can only retrieve max NSIS_MAX_STRLEN characters (usually 4K, sometimes 8K...)
 #define ANY_REQUEST_ID				0
 #define ANY_PRIORITY				0
-#define ANY_STATUS					(REQUEST_STATUS)-1
+#define ANY_STATUS					((REQUEST_STATUS)-1)
 
 #define TEXT_USERAGENT				_T( "xfer/1.0" )
 #define TEXT_STATUS_WAITING			_T( "Waiting" )
@@ -116,7 +120,7 @@ typedef struct _QUEUE_REQUEST {
 			LPTSTR pszFile;			/// Valid for REQUEST_LOCAL_FILE
 			HANDLE hFile;
 		};
-		LPBYTE pMemory;				/// Valid for REQUEST_LOCAL_MEMORY. The buffer size will be iFileSize
+		LPBYTE pMemory;				/// Valid for REQUEST_LOCAL_MEMORY. Reserves MAX_MEMORY_CONTENT_LENGTH of virtual memory
 	} Local;
 
 	// Transfer options
@@ -210,7 +214,9 @@ typedef struct _QUEUE {
 
 	// Worker threads
 	THREAD pThreads[MAX_WORKER_THREADS];
-	int iThreadCount;
+	ULONG iThreadCount;					// Current thread count
+	volatile LONG iThreadBusyCount;		// Busy thread count
+	ULONG iThreadMaxCount;				// Maximum thread count
 	HANDLE hThreadTermEvent;
 	HANDLE hThreadWakeEvent;
 
@@ -219,7 +225,7 @@ typedef struct _QUEUE {
 
 // Initializing
 VOID QueueInitialize( _Inout_ PQUEUE pQueue, _In_ LPCTSTR szName, _In_ int iThreadCount );
-VOID QueueDestroy( _Inout_ PQUEUE pQueue, _In_ BOOLEAN bFromDllUnload );
+VOID QueueDestroy( _Inout_ PQUEUE pQueue );
 
 // Queue locking
 VOID QueueLock( _Inout_ PQUEUE pQueue );
@@ -260,4 +266,4 @@ ULONG QueueSize( _Inout_ PQUEUE pQueue );
 // Wake up one or more worker threads
 // Returns the number of threads woken up
 // The queue must be locked
-int QueueWakeThreads( _In_ PQUEUE pQueue, _In_ int iThreadsToWake );
+int QueueWakeThreads( _In_ PQUEUE pQueue, _In_ ULONG iThreadsToWake );
