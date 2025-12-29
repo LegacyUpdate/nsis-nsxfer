@@ -101,8 +101,7 @@ all-before:
 	mkdir -p $(OUTDIR)
 
 nsis-sdk:
-	REM ----- NSIS SDK ------------------------------------------------------------
-	call py -3 _get_nsis_sdk.py
+	python _get_nsis_sdk.py
 
 # Link
 $(_BIN): $(_OBJ)
