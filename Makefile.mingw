@@ -34,7 +34,7 @@ STATIC   = $(OUTDIR)/lib$(PROJECT).a
 # ARCH
 ifeq ($(ARCH), X64)
 	PREFIX  := $(PREFIX64)
-	CFLAGS  += -DNDEBUG
+	CFLAGS  += -mtune=generic -DNDEBUG
 	LDFLAGS += -Wl,--high-entropy-va -Wl,-e'DllMain'
 	RCFLAGS += -F pe-x86-64
 else
