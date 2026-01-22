@@ -1,20 +1,11 @@
-
+/build
 /nsis
-
-/Test/*.exe
-/Test/_*
-
-/TestDebug/*.exe
-/TestDebug/_*
 
 /NSxfer*.7z
 
-Debug-*
-Release-*
 ipch
 .vs
 
-*.opensdf
 *.sdf
 *.suo
 *.user

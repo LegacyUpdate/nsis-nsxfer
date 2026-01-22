@@ -5,8 +5,7 @@ echo.
 
 cd /d "%~dp0"
 
-call "%CD%\Test\cleanup.bat"
-call "%CD%\TestDebug\cleanup.bat"
+call "%cd%\Test\cleanup.bat"
 call :CLEANUP
 call :CLEANUP
 call :CLEANUP
@@ -17,8 +16,7 @@ goto :EOF
 rd /S /Q .vs
 rd /S /Q ipch
 
-for /D %%a in (Debug*)   do rd /S /Q "%%a"
-for /D %%a in (Release*) do rd /S /Q "%%a"
+rd /S /Q build
 rd /S /Q nsis
 
 del *.aps
