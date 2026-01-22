@@ -39,13 +39,16 @@ override PYTHON ?= $(if $(filter Windows_NT,$(OS)),py -3,python3)
 
 # ARCH
 ifeq ($(ARCH), X64)
-	CFLAGS  +=
+	PREFIX  := $(PREFIX64)
+	CFLAGS  += -mtune=generic -DNDEBUG
 	LDFLAGS += -Wl,--high-entropy-va -Wl,-e'DllMain'
 	RCFLAGS += -F pe-x86-64
 else
-	CFLAGS  += -march=pentium2
-	LDFLAGS += -Wl,-e'_DllMain'
-	RCFLAGS += -F pe-i386
+	PREFIX  := $(PREFIX32)
+	CFLAGS  += -march=i486 -DNDEBUG
+	CFLAGS  +=
+	LDFLAGS += -Wl,--high-entropy-va -Wl,-e'DllMain'
+	RCFLAGS += -F pe-x86-64
 endif
 
 # CHAR
@@ -109,6 +112,10 @@ clean:
 all: all-before nsis-sdk $(_BIN) all-after
 
 all-before:
+	mkdir -p $(OUTDIR)
+
+# Link
+$(_BIN): $(_OBJ)
 	mkdir -pv "$(OUTDIR)"
 
 nsis-sdk:

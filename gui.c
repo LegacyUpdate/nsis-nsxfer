@@ -11,7 +11,7 @@
 #define GUI_TIMER_REFRESH_ID	1
 #define GUI_TIMER_REFRESH_TIME	500
 #define GUI_OUTPUT_STRING_LEN	1024
-#define TEXT_NA					_T( "n/a" )
+#define TEXT_NA					_T( "-" )
 #define WM_ABORT_CLOSED			WM_USER + 0x266
 
 #define DEFAULT_TITLE_SINGLE	_T("{PERCENT}% - Downloading...")
@@ -677,8 +677,8 @@ ULONG GuiWaitPage()
 	/// Original InstFiles page controls
 	HWND hInstFilesPage = NULL, hStatus = NULL, hProgress = NULL, hDetailsBtn = NULL, hDetailsList = NULL;
 	RECT rcStatus, rcProgress, rcDetailsBtn, rcDetailsList;
-	LONG iStatusStyle, iStatusStyleEx;
-	LONG iProgressStyle, iProgressStyleEx;
+	LONG iStatusStyle, iStatusStyleEx, iStatusUserData;
+	LONG iProgressStyle, iProgressStyleEx, iProgressUserData;
 	HWND hAbortBtn = NULL;
 
 	/// New controls
@@ -703,6 +703,7 @@ ULONG GuiWaitPage()
 				ScreenToClient( hInstFilesPage, (LPPOINT)&rcStatus.right );
 				iStatusStyle = (LONG)GetWindowLongPtr( hStatus, GWL_STYLE );
 				iStatusStyleEx = (LONG)GetWindowLongPtr( hStatus, GWL_EXSTYLE );
+				iStatusUserData = (LONG)GetWindowLongPtr( hStatus, GWLP_USERDATA );
 
 				/// InstFiles page progress bar
 				GetWindowRect( hProgress, &rcProgress );
@@ -710,6 +711,7 @@ ULONG GuiWaitPage()
 				ScreenToClient( hInstFilesPage, (LPPOINT)&rcProgress.right );
 				iProgressStyle = (LONG)GetWindowLongPtr( hProgress, GWL_STYLE );
 				iProgressStyleEx = (LONG)GetWindowLongPtr( hProgress, GWL_EXSTYLE );
+				iProgressUserData = (LONG)GetWindowLongPtr( hProgress, GWLP_USERDATA );
 
 				/// InstFiles page details button
 				hDetailsBtn = GetDlgItem( hInstFilesPage, 1027 );
@@ -732,11 +734,13 @@ ULONG GuiWaitPage()
 				OffsetRect( &rcNewStatus, 0, (rcProgress.bottom - rcStatus.top) + (rcDetailsList.top - rcProgress.bottom) );
 				hNewStatus = CreateWindowEx( iStatusStyleEx, _T( "STATIC" ), _T( "" ), iStatusStyle, LTWH( rcNewStatus ), hInstFilesPage, NULL, NULL, NULL );
 				SendMessage( hNewStatus, WM_SETFONT, (WPARAM)SendMessage( hStatus, WM_GETFONT, 0, 0 ), MAKELPARAM( FALSE, 0 ) );
+				SetWindowLongPtr( hNewStatus, GWLP_USERDATA, iStatusUserData );
 
 				/// New progress bar
 				CopyRect( &rcNewProgress, &rcProgress );
 				OffsetRect( &rcNewProgress, 0, rcNewStatus.bottom + (rcStatus.bottom - rcProgress.top) - rcNewProgress.top );
 				hNewProgress = CreateWindowEx( iProgressStyleEx, PROGRESS_CLASS, _T( "" ), iProgressStyle, LTWH( rcNewProgress ), hInstFilesPage, NULL, NULL, NULL );
+				SetWindowLongPtr( hNewProgress, GWLP_USERDATA, iProgressUserData );
 
 				iDetailsOffsetY = rcNewProgress.bottom + (rcDetailsList.top - rcProgress.bottom) - rcDetailsList.top;
 				iDetailsOffsetY += iDetailsOffsetY / 8;
@@ -909,98 +913,14 @@ ULONG GuiWait( __in PGUI_WAIT_PARAM pParam )
 }
 
 
-INT_PTR CALLBACK GuiAbortDialogProc( _In_ HWND hDlg, _In_ UINT uMsg, _In_ WPARAM wParam, _In_ LPARAM lParam )
-{
-	switch (uMsg)
-	{
-	case WM_INITDIALOG:
-	{
-		TCHAR szText[128];
-		HMODULE hUser32 = GetModuleHandle( _T( "user32" ) );
-
-		/// Icon
-		HICON hIco = LoadImage( hUser32, MAKEINTRESOURCE( 102 ), IMAGE_ICON, 32, 32, 0 );
-		assert( hIco );
-		if (hIco) {
-			SendDlgItemMessage( hDlg, IDC_POPUP_ICON, STM_SETICON, (WPARAM)hIco, 0 );
-			SetProp( hDlg, _T( "MyIcon" ), hIco );
-		}
-
-		/// Text
-		if (g_Gui.pszAbortTitle)
-			SetWindowText( hDlg, g_Gui.pszAbortTitle );
-		if (g_Gui.pszAbortMsg)
-			SetDlgItemText( hDlg, IDC_STATIC_TEXT, g_Gui.pszAbortMsg );
-
-		if (LoadString( hUser32, 805, szText, ARRAYSIZE( szText ) ) > 0)
-			SetDlgItemText( hDlg, IDYES, szText );
-		if (LoadString( hUser32, 806, szText, ARRAYSIZE( szText ) ) > 0)
-			SetDlgItemText( hDlg, IDNO, szText );
-		break;
-	}
-
-	case WM_DESTROY:
-	{
-		HICON hIco = (HICON)GetProp( hDlg, _T( "MyIcon" ) );
-		if (hIco) {
-			RemoveProp( hDlg, _T( "MyIcon" ) );
-			DestroyIcon( hIco );
-		}
-		if (TRUE) {
-			HWND hCallbackWnd = (HWND)GetProp( hDlg, _T( "CallbackWnd" ) );
-			UINT iCallbackMsg = HandleToULong( GetProp( hDlg, _T( "CallbackMsg" ) ) );
-			BOOL bAnswerYes = (BOOL)HandleToUlong( GetProp( hDlg, _T( "AnswerYes" ) ) );
-			RemoveProp( hDlg, _T( "CallbackWnd" ) );
-			RemoveProp( hDlg, _T( "CallbackMsg" ) );
-			RemoveProp( hDlg, _T( "AnswerYes" ) );
-			if (hCallbackWnd)
-				PostMessage( hCallbackWnd, iCallbackMsg, (WPARAM)bAnswerYes, 0 );
-		}
-		g_Gui.hAbortWnd = NULL;
-		break;
-	}
-
-	case WM_COMMAND:
-	{
-		switch (LOWORD( wParam ))
-		{
-		case IDYES:
-			SetProp( hDlg, _T( "AnswerYes" ), (HANDLE)TRUE );
-			DestroyWindow( hDlg );
-			break;
-
-		case IDNO:
-		case IDCANCEL:
-			DestroyWindow( hDlg );
-			break;
-		}
-		break;
-	}
-
-	case WM_SYSCOMMAND:
-	{
-		if (wParam == SC_CLOSE)
-			DestroyWindow( hDlg );
-		break;
-	}
-	}
-
-	return FALSE;		/// Default dialog procedure
-}
-
-
 void GuiAbortShow( __in HWND hParent, __in HWND hCallbackWnd, __in UINT iCallbackMsg )
 {
 	if (g_Gui.bAbort) {		/// Abortion permitted?
 		if (!g_Gui.bAborted) {	/// Already aborted?
 			if (g_Gui.pszAbortMsg && *g_Gui.pszAbortMsg) {	/// Abortion message available?
-				if (!g_Gui.hAbortWnd) {		/// Confirmation dialog already visible?
-					g_Gui.hAbortWnd = CreateDialogParam( g_hInst, MAKEINTRESOURCE( IDD_CONFIRMATION ), hParent, GuiAbortDialogProc, 0 );
-					if (g_Gui.hAbortWnd) {
-						SetProp( g_Gui.hAbortWnd, _T( "CallbackWnd" ), (HANDLE)hCallbackWnd );
-						SetProp( g_Gui.hAbortWnd, _T( "CallbackMsg" ), ULongToHandle( iCallbackMsg ) );
-						ShowWindow( g_Gui.hAbortWnd, SW_SHOW );
-					}
+				if (MessageBox(hParent, g_Gui.pszAbortMsg, g_Gui.pszAbortTitle, MB_YESNO | MB_ICONEXCLAMATION) == IDYES) {
+					if (hCallbackWnd)
+						PostMessage(hCallbackWnd, iCallbackMsg, (WPARAM)TRUE, 0);
 				}
 			} else {
 				/// No message is available. Abort without warning
