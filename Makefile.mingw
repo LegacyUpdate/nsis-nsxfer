@@ -5,14 +5,12 @@
 #   ARCH=X86|x64
 #   CHAR=ANSI|Unicode
 #   OUTDIR=<output_directory>
-#   CONFIG=Debug|Release
 # -------------------------------
 # Optional definitions
 # -------------------------------
-#   PREFIX=
-#   CUSTOM_CFLAGS=
-#   CUSTOM_LDFLAGS=
-#   CUSTOM_RCFLAGS=
+#   CUSTOM_CFLAGS
+#   CUSTOM_LDFLAGS
+#   CUSTOM_RCFLAGS
 
 
 PROJECT  = NSxfer
@@ -26,10 +24,6 @@ _BIN     = $(patsubst %,$(OUTDIR)/%,$(BIN))
 
 DEF      = $(OUTDIR)/lib$(PROJECT).def
 STATIC   = $(OUTDIR)/lib$(PROJECT).a
-
-override PYTHON ?= $(if $(filter Windows_NT,$(OS)),py -3,python3)
-
-# -------------------------------
 
 #
 # https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
@@ -46,9 +40,8 @@ ifeq ($(ARCH), X64)
 else
 	PREFIX  := $(PREFIX32)
 	CFLAGS  += -march=i486 -DNDEBUG
-	CFLAGS  +=
-	LDFLAGS += -Wl,--high-entropy-va -Wl,-e'DllMain'
-	RCFLAGS += -F pe-x86-64
+	LDFLAGS += -Wl,-e'_DllMain'
+	RCFLAGS += -F pe-i386
 endif
 
 # CHAR
@@ -60,21 +53,14 @@ else
 	LDFLAGS +=
 endif
 
-# CONFIG
-ifeq ($(CONFIG), Debug)
-	CFLAGS  += -DDEBUG -D_DEBUG -g -O0
-	RCFLAGS += -DDEBUG -D_DEBUG
-else
-	CFLAGS  += -DNDEBUG -O3 -s
-	RCFLAGS += -DNDEBUG
-endif
-
 # https://sourceforge.net/p/mingw-w64/wiki2/gnu%20printf/
 CFLAGS += -D__USE_MINGW_ANSI_STDIO=0
 
 CFLAGS += \
 	-mdll \
 	-nostdlib \
+	-s \
+	-Os \
 	-fPIE \
 	-ffunction-sections \
 	-fdata-sections \
@@ -104,45 +90,30 @@ RCFLAGS += \
 	$(CUSTOM_RCFLAGS)
 
 
-.PHONY: clean all-before nsis-sdk all pdb all-after
+.PHONY: clean all-before nsis-sdk all all-after
 
 clean:
-	rm -rf "$(OUTDIR)"
+	rm -rf $(OUTDIR)
 
 all: all-before nsis-sdk $(_BIN) all-after
 
 all-before:
 	mkdir -p $(OUTDIR)
 
-# Link
-$(_BIN): $(_OBJ)
-	mkdir -pv "$(OUTDIR)"
-
 nsis-sdk:
-	$(PYTHON) _get_nsis_sdk.py
-
-pdb:
-# https://github.com/rainers/cv2pdb must be in PATH
-ifeq ($(OS), Windows_NT)
-	@echo
-	cv2pdb "$(_BIN)"
-endif
+	python _get_nsis_sdk.py
 
 # Link
 $(_BIN): $(_OBJ)
-	@echo
 	$(PREFIX)gcc $(_OBJ) -o $(_BIN) $(LDFLAGS)
 
 # Compile .c
 $(OUTDIR)/%.o: %.c
-	@echo
 	$(PREFIX)gcc $(CFLAGS) -o $@ -c $<
 
 $(OUTDIR)/%.o: nsis/pluginapi.c
-	@echo
 	$(PREFIX)gcc $(CFLAGS) -o $@ -c $<
 
 # Compile .rc
 $(OUTDIR)/%.res: %.rc
-	@echo
 	$(PREFIX)windres -o $@ -i $< -O coff --input-format=rc $(RCFLAGS)
