@@ -1,7 +1,7 @@
 ## Building a new copy of NSXfer for LegacyUpdate.
 
 The build process for this is deceptively complex. The best approach I've found
-is to use a modern version of Windows. When compiling against NSIS 3.11, I used
+is to use a modern version of Windows. When compiling against NSIS 3.12, I used
 Windows Server 2012 R2, but any version after 8.1/Server 2012 R2 should work.
 
 The first step is to download some required software:
@@ -37,7 +37,7 @@ Contrib/ExDLL/pluginapi.h
 ```
 
 These files can be obtained from the NSIS source tree. The ones used at the moment
-come from NSIS 3.11.
+come from NSIS 3.12.
 
 Next, copy this into your local tree of LegacyUpdate and run a build. Test it on a
 VM to make sure that you're able to download files. When that's done, give a copy of

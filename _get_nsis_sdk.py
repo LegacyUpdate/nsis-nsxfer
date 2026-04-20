@@ -8,10 +8,10 @@ from urllib import request
 
 cd = Path(__file__).parent
 files = {
-    cd.joinpath('nsis', 'api.h')        : "https://www.linuxfromscratch.org/~renodr/NSIS/3.11/api.h",
-    cd.joinpath('nsis', 'nsis_tchar.h') : "https://www.linuxfromscratch.org/~renodr/NSIS/3.11/nsis_tchar.h",
-    cd.joinpath('nsis', 'pluginapi.c')  : "https://www.linuxfromscratch.org/~renodr/NSIS/3.11/pluginapi.c",
-    cd.joinpath('nsis', 'pluginapi.h')  : "https://www.linuxfromscratch.org/~renodr/NSIS/3.11/pluginapi.h",
+    cd.joinpath('nsis', 'api.h')        : "https://www.linuxfromscratch.org/~renodr/NSIS/3.12/api.h",
+    cd.joinpath('nsis', 'nsis_tchar.h') : "https://www.linuxfromscratch.org/~renodr/NSIS/3.12/nsis_tchar.h",
+    cd.joinpath('nsis', 'pluginapi.c')  : "https://www.linuxfromscratch.org/~renodr/NSIS/3.12/pluginapi.c",
+    cd.joinpath('nsis', 'pluginapi.h')  : "https://www.linuxfromscratch.org/~renodr/NSIS/3.12/pluginapi.h",
 }
 
 download = False
