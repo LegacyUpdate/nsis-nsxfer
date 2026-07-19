@@ -6,7 +6,7 @@ Windows Server 2012 R2, but any version after 8.1/Server 2012 R2 should work.
 
 The first step is to download some required software:
 
-- Python 3.13.13 (or 3.14.4 if you're on Server 2016 / Windows 10 and later)
+- Python 3.13.14 (or 3.14.6 if you're on Server 2016 / Windows 10 and later)
 - Git for Windows (for cloning the repository)
 - Cygwin (add GCC, MinGW GCC for i686 and x86_64, Make, and Tar)
 
